@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股交易摩擦成本與損益模擬器</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #0b1120;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --tw-up: #ef4444;     /* 台股紅漲 */
+            --tw-up-bg: rgba(239, 68, 68, 0.12);
+            --tw-down: #10b981;   /* 台股綠跌 */
+            --tw-down-bg: rgba(16, 185, 129, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 24px 16px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title-group h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+        }
+
+        .title-group p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 860px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Segmented Control */
+        .segmented-control {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            background-color: var(--bg-input);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 18px;
+        }
+
+        .segmented-control.two-cols {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .seg-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .seg-btn.active {
+            background-color: var(--bg-card);
+            color: var(--accent);
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-label span.val-highlight {
+            color: var(--text-main);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--accent);
+        }
+
+        .step-btn {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .step-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            margin-top: 6px;
+            cursor: pointer;
+        }
+
+        /* Summary KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .kpi-card {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .kpi-value {
+            font-size: 1.45rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .kpi-sub {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .text-up { color: var(--tw-up); }
+        .text-down { color: var(--tw-down); }
+        .text-accent { color: var(--accent); }
+
+        /* Cost Breakdown Bar */
+        .breakdown-box {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.85rem;
+        }
+
+        .breakdown-item span {
+            color: var(--text-muted);
+            margin-right: 6px;
+        }
+
+        .breakdown-item strong {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Tick Ladder Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        th {
+            text-align: right;
+            padding: 10px 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+        }
+
+        th:first-child, td:first-child {
+            text-align: left;
+        }
+
+        td {
+            text-align: right;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        tr.row-target {
+            background-color: rgba(56, 189, 248, 0.12);
+            outline: 1px solid rgba(56, 189, 248, 0.4);
+        }
+
+        tr.row-breakeven {
+            border-left: 3px solid var(--accent);
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .pill-up {
+            background-color: var(--tw-up-bg);
+            color: var(--tw-up);
+        }
+
+        .pill-down {
+            background-color: var(--tw-down-bg);
+            color: var(--tw-down);
+        }
+
+        .bar-wrap {
+            width: 90px;
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="title-group">
+            <h1>台股交易摩擦成本與損益模擬器</h1>
+            <p>即時試算手續費折數、證交稅、損益平衡點與升降檔位淨利（紅漲綠跌）</p>
+        </div>
+        <span class="badge">Vibe Coding 互動實作</span>
+    </header>
+
+    <div class="grid-layout">
+        <!-- 左側參數輸入面板 -->
+        <div class="card">
+            <div class="card-title">交易參數設定</div>
+
+            <div class="form-group">
+                <div class="form-label">交易模式與稅率</div>
+                <div class="segmented-control" id="modeControl">
+                    <button class="seg-btn active" data-mode="normal" data-tax="0.003">現股 (0.3%)</button>
+                    <button class="seg-btn" data-mode="daytrade" data-tax="0.0015">當沖 (0.15%)</button>
+                    <button class="seg-btn" data-mode="etf" data-tax="0.001">ETF (0.1%)</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-label">交易單位（影響最低手續費門檻）</div>
+                <div class="segmented-control two-cols" id="unitControl">
+                    <button class="seg-btn active" data-unit="lot">整張 (1張=1000股 / 低消20元)</button>
+                    <button class="seg-btn" data-unit="odd">零股 (1股起 / 低消1元)</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-label">
+                    <span>買進價格 (元)</span>
+                    <span class="val-highlight" id="tickInfo">升降單位: 0.5 元</span>
+                </div>
+                <div class="input-row">
+                    <button class="step-btn" id="buyMinus">-1檔</button>
+                    <input type="number" id="buyPrice" value="150" min="1" step="0.5">
+                    <button class="step-btn" id="buyPlus">+1檔</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-label">
+                    <span>賣出目標價 (元)</span>
+                    <span class="val-highlight" id="ticksDiffText">+2 檔</span>
+                </div>
+                <div class="input-row">
+                    <button class="step-btn" id="sellMinus">-1檔</button>
+                    <input type="number" id="sellPrice" value="151" min="1" step="0.5">
+                    <button class="step-btn" id="sellPlus">+1檔</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-label">
+                    <span id="qtyLabel">交易張數 (張)</span>
+                    <span class="val-highlight" id="totalSharesText">共 1,000 股</span>
+                </div>
+                <div class="input-row">
+                    <input type="number" id="qtyInput" value="1" min="1" step="1">
+                </div>
+                <input type="range" id="qtySlider" min="1" max="20" value="1">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-label">
+                    <span>券商手續費折數</span>
+                    <span class="val-highlight" id="discountText">2.8 折 (約 0.0399%)</span>
+                </div>
+                <input type="range" id="discountSlider" min="1" max="10" step="0.1" value="2.8">
+            </div>
+        </div>
+
+        <!-- 右側即時分析與升降檔位面板 -->
+        <div class="card">
+            <div class="card-title">
+                <span>即時損益與摩擦成本分析</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">法定手續費率 0.1425%</span>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">預估淨損益 (NTD)</div>
+                    <div class="kpi-value" id="netProfitVal">+0</div>
+                    <div class="kpi-sub" id="roiVal">報酬率: 0.00%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">損益平衡價 (需高於此價)</div>
+                    <div class="kpi-value text-accent" id="breakevenVal">0.00</div>
+                    <div class="kpi-sub" id="breakevenTicks">至少需上漲 +1 檔才獲利</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">買賣總摩擦成本</div>
+                    <div class="kpi-value" id="totalCostVal">0</div>
+                    <div class="kpi-sub" id="costRatioVal">佔總投入本金 0.00%</div>
+                </div>
+            </div>
+
+            <div class="breakdown-box">
+                <div class="breakdown-item">
+                    <span>買進總價金:</span>
+                    <strong id="buyNotionalVal">$150,000</strong>
+                </div>
+                <div class="breakdown-item">
+                    <span>買進手續費:</span>
+                    <strong id="buyFeeVal">$60</strong>
+                </div>
+                <div class="breakdown-item">
+                    <span>賣出手續費:</span>
+                    <strong id="sellFeeVal">$60</strong>
+                </div>
+                <div class="breakdown-item">
+                    <span>賣出證交稅:</span>
+                    <strong id="taxVal">$453</strong>
+                </div>
+            </div>
+
+            <div class="card-title" style="margin-bottom: 10px;">
+                <span>買進價上下 5 檔損益模擬表（Tick 階梯）</span>
+                <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">點擊任一列可直接帶入賣出目標價</span>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>檔位變化</th>
+                            <th>賣出價位</th>
+                            <th>摩擦成本 (費+稅)</th>
+                            <th>淨損益 (元)</th>
+                            <th>淨報酬率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ladderBody">
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 狀態管理
+    const state = {
+        taxRate: 0.003,      // 預設現股 0.3%
+        isETF: false,
+        unit: 'lot',         // 'lot' 整張 (1000股, 低消20) | 'odd' 零股 (1股, 低消1)
+        buyPrice: 150,
+        sellPrice: 151,
+        qty: 1,
+        discount: 2.8        // 2.8 折
+    };
+
+    const BASE_FEE_RATE = 0.001425;
+
+    // 計算台股升降單位 (Tick Size)
+    function getTickSize(price, isETF) {
+        if (isETF) {
+            return price < 50 ? 0.01 : 0.05;
+        }
+        if (price < 10) return 0.01;
+        if (price < 50) return 0.05;
+        if (price < 100) return 0.1;
+        if (price < 500) return 0.5;
+        if (price < 1000) return 1;
+        return 5;
+    }
+
+    // 浮點數精確對齊
+    function roundPrice(val) {
+        return Math.round(val * 100) / 100;
+    }
+
+    // 計算單筆交易損益
+    function calculateTrade(buyP, sellP, shares, discount, taxRate, minFee) {
+        const buyNotional = Math.round(buyP * shares);
+        const sellNotional = Math.round(sellP * shares);
+        const effFeeRate = BASE_FEE_RATE * (discount / 10);
+
+        const buyFee = Math.max(minFee, Math.floor(buyNotional * effFeeRate));
+        const sellFee = Math.max(minFee, Math.floor(sellNotional * effFeeRate));
+        const tax = Math.floor(sellNotional * taxRate);
+
+        const totalCost = buyFee + sellFee + tax;
+        const netProfit = (sellNotional - buyNotional) - totalCost;
+        const totalInvested = buyNotional + buyFee;
+        const roi = totalInvested > 0 ? (netProfit / totalInvested) * 100 : 0;
+
+        return {
+            buyNotional,
+            sellNotional,
+            buyFee,
+            sellFee,
+            tax,
+            totalCost,
+            netProfit,
+            roi
+        };
+    }
+
+    // 格式化數字
+    function fmtNum(num) {
+        return num.toLocaleString('zh-TW');
+    }
+
+    // 更新畫面
+    function render() {
+        const shares = state.unit === 'lot' ? state.qty * 1000 : state.qty;
+        const minFee = state.unit === 'lot' ? 20 : 1;
+        const tick = getTickSize(state.buyPrice, state.isETF);
+
+        // 更新提示文字
+        document.getElementById('tickInfo').textContent = `升降單位: ${tick} 元`;
+        document.getElementById('totalSharesText').textContent = `共 ${fmtNum(shares)} 股`;
+
+        const effRatePct = (0.1425 * (state.discount / 10)).toFixed(4);
+        document.getElementById('discountText').textContent = `${state.discount.toFixed(1)} 折 (${effRatePct}%)`;
+
+        const tickDiff = Math.round((state.sellPrice - state.buyPrice) / tick * 10) / 10;
+        const diffSign = tickDiff > 0 ? '+' : '';
+        document.getElementById('ticksDiffText').textContent = `${diffSign}${tickDiff} 檔`;
+
+        // 主結果計算
+        const res = calculateTrade(state.buyPrice, state.sellPrice, shares, state.discount, state.taxRate, minFee);
+
+        const netProfitEl = document.getElementById('netProfitVal');
+        const pSign = res.netProfit > 0 ? '+' : '';
+        netProfitEl.textContent = `${pSign}${fmtNum(res.netProfit)}`;
+        netProfitEl.className = 'kpi-value ' + (res.netProfit > 0 ? 'text-up' : (res.netProfit < 0 ? 'text-down' : ''));
+
+        const roiEl = document.getElementById('roiVal');
+        roiEl.textContent = `淨報酬率: ${pSign}${res.roi.toFixed(2)}%`;
+
+        // 理論損益平衡價
+        const effFeeRate = BASE_FEE_RATE * (state.discount / 10);
+        // 考慮最低手續費的精確平衡點
+        const exactBreakeven = (state.buyPrice * shares + res.buyFee + Math.max(minFee, state.buyPrice * shares * effFeeRate)) / (shares * (1 - state.taxRate));
+        // 往上找幾檔才會真正賺錢 (netProfit >= 0)
+        let neededTicks = 0;
+        let testPrice = state.buyPrice;
+        while (neededTicks < 30) {
+            const testRes = calculateTrade(state.buyPrice, testPrice, shares, state.discount, state.taxRate, minFee);
+            if (testRes.netProfit > 0) break;
+            neededTicks++;
+            testPrice = roundPrice(testPrice + getTickSize(testPrice, state.isETF));
+        }
+
+        document.getElementById('breakevenVal').textContent = testPrice.toFixed(2);
+        document.getElementById('breakevenTicks').textContent = `至少需上漲 +${neededTicks} 檔才獲利`;
+
+        document.getElementById('totalCostVal').textContent = `$${fmtNum(res.totalCost)}`;
+        const costRatio = res.buyNotional > 0 ? (res.totalCost / res.buyNotional) * 100 : 0;
+        document.getElementById('costRatioVal').textContent = `佔成交本金 ${costRatio.toFixed(2)}%`;
+
+        // 細項
+        document.getElementById('buyNotionalVal').textContent = `$${fmtNum(res.buyNotional)}`;
+        document.getElementById('buyFeeVal').textContent = `$${fmtNum(res.buyFee)}`;
+        document.getElementById('sellFeeVal').textContent = `$${fmtNum(res.sellFee)}`;
+        document.getElementById('taxVal').textContent = `$${fmtNum(res.tax)}`;
+
+        // 建立上下 5 檔表格
+        const tbody = document.getElementById('ladderBody');
+        tbody.innerHTML = '';
+
+        const rowsData = [];
+        let maxAbsProfit = 1;
+
+        for (let i = 5; i >= -5; i--) {
+            const p = roundPrice(state.buyPrice + i * tick);
+            if (p <= 0) continue;
+            const r = calculateTrade(state.buyPrice, p, shares, state.discount, state.taxRate, minFee);
+            if (Math.abs(r.netProfit) > maxAbsProfit) {
+                maxAbsProfit = Math.abs(r.netProfit);
+            }
+            rowsData.push({ tickStep: i, price: p, ...r });
+        }
+
+        rowsData.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            if (Math.abs(item.price - state.sellPrice) < 0.001) {
+                tr.classList.add('row-target');
+            }
+            if (item.tickStep === neededTicks) {
+                tr.classList.add('row-breakeven');
+            }
+
+            tr.addEventListener('click', () => {
+                state.sellPrice = item.price;
+                document.getElementById('sellPrice').value = item.price;
+                render();
+            });
+
+            const stepLabel = item.tickStep > 0 ? `+${item.tickStep} 檔` : (item.tickStep === 0 ? `平盤 (0 檔)` : `${item.tickStep} 檔`);
+            const isUp = item.netProfit > 0;
+            const profitClass = isUp ? 'text-up' : (item.netProfit < 0 ? 'text-down' : '');
+            const pillClass = isUp ? 'pill-up' : 'pill-down';
+            const sign = isUp ? '+' : '';
+            const barWidth = Math.min(100, Math.round((Math.abs(item.netProfit) / maxAbsProfit) * 100));
+            const barColor = isUp ? 'var(--tw-up)' : 'var(--tw-down)';
+
+            tr.innerHTML = `
+                <td><strong>${stepLabel}</strong> ${item.tickStep === neededTicks ? '<span style="font-size:0.7rem;color:var(--accent);margin-left:4px;">★損平檔</span>' : ''}</td>
+                <td>${item.price.toFixed(2)}</td>
+                <td style="color: var(--text-muted);">$${fmtNum(item.totalCost)}</td>
+                <td class="${profitClass}" style="font-weight: 600;">
+                    ${sign}${fmtNum(item.netProfit)}
+                    <div class="bar-wrap">
+                        <div class="bar-fill" style="width: ${barWidth}%; background: ${barColor};"></div>
+                    </div>
+                </td>
+                <td><span class="pill ${pillClass}">${sign}${item.roi.toFixed(2)}%</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 綁定事件
+    document.querySelectorAll('#modeControl .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#modeControl .seg-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.taxRate = parseFloat(btn.dataset.tax);
+            state.isETF = btn.dataset.mode === 'etf';
+            render();
+        });
+    });
+
+    document.querySelectorAll('#unitControl .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#unitControl .seg-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.unit = btn.dataset.unit;
+            const qtyInput = document.getElementById('qtyInput');
+            const qtySlider = document.getElementById('qtySlider');
+            if (state.unit === 'lot') {
+                document.getElementById('qtyLabel').textContent = '交易張數 (張)';
+                state.qty = 1;
+                qtyInput.value = 1;
+                qtySlider.max = 20;
+                qtySlider.value = 1;
+            } else {
+                document.getElementById('qtyLabel').textContent = '交易股數 (零股)';
+                state.qty = 100;
+                qtyInput.value = 100;
+                qtySlider.max = 999;
+                qtySlider.value = 100;
+            }
+            render();
+        });
+    });
+
+    document.getElementById('buyPrice').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (val > 0) {
+            state.buyPrice = val;
+            render();
+        }
+    });
+
+    document.getElementById('sellPrice').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (val > 0) {
+            state.sellPrice = val;
+            render();
+        }
+    });
+
+    document.getElementById('buyMinus').addEventListener('click', () => {
+        const tick = getTickSize(state.buyPrice, state.isETF);
+        state.buyPrice = Math.max(1, roundPrice(state.buyPrice - tick));
+        document.getElementById('buyPrice').value = state.buyPrice;
+        render();
+    });
+
+    document.getElementById('buyPlus').addEventListener('click', () => {
+        const tick = getTickSize(state.buyPrice, state.isETF);
+        state.buyPrice = roundPrice(state.buyPrice + tick);
+        document.getElementById('buyPrice').value = state.buyPrice;
+        render();
+    });
+
+    document.getElementById('sellMinus').addEventListener('click', () => {
+        const tick = getTickSize(state.sellPrice, state.isETF);
+        state.sellPrice = Math.max(1, roundPrice(state.sellPrice - tick));
+        document.getElementById('sellPrice').value = state.sellPrice;
+        render();
+    });
+
+    document.getElementById('sellPlus').addEventListener('click', () => {
+        const tick = getTickSize(state.sellPrice, state.isETF);
+        state.sellPrice = roundPrice(state.sellPrice + tick);
+        document.getElementById('sellPrice').value = state.sellPrice;
+        render();
+    });
+
+    document.getElementById('qtyInput').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (val > 0) {
+            state.qty = val;
+            document.getElementById('qtySlider').value = Math.min(val, document.getElementById('qtySlider').max);
+            render();
+        }
+    });
+
+    document.getElementById('qtySlider').addEventListener('input', (e) => {
+        state.qty = parseInt(e.target.value, 10);
+        document.getElementById('qtyInput').value = state.qty;
+        render();
+    });
+
+    document.getElementById('discountSlider').addEventListener('input', (e) => {
+        state.discount = parseFloat(e.target.value);
+        render();
+    });
+
+    // 初始化渲染
+    render();
+</script>
+</body>
+</html>
